@@ -388,10 +388,10 @@ def create_contract():
         contract_id = cursor.fetchone()["id"]
     
     milestones = data.get("milestones", [])
-        for m in milestones:
-            with db_execute(conn, "INSERT INTO milestones (contract_id, description, amount, due_date) VALUES (%s, %s, %s, %s)",
-                         (contract_id, m.get("description"), m.get("amount"), m.get("due_date"))):
-                pass
+    for m in milestones:
+        with db_execute(conn, "INSERT INTO milestones (contract_id, description, amount, due_date) VALUES (%s, %s, %s, %s)",
+                        (contract_id, m.get("description"), m.get("amount"), m.get("due_date"))):
+            pass
 
     conn.commit()
     conn.close()
