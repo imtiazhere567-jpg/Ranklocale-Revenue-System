@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ranklocale Revenue System</title>
+    <meta name="description" content="Ranklocale Revenue & Client Management System — Track contracts, clients, payments, and deadlines.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+            <div class="brand-icon">R</div>
+            <span class="brand-text">Ranklocale</span>
+        </div>
+        <nav class="sidebar-nav">
+            <a href="#" class="nav-item" data-page="dashboard" id="nav-dashboard">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                <span>Dashboard</span>
+            </a>
+            <a href="#" class="nav-item" data-page="contracts" id="nav-contracts">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                <span>Contracts</span>
+            </a>
+            <a href="#" class="nav-item" data-page="clients" id="nav-clients">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+                <span>Clients</span>
+            </a>
+            <a href="#" class="nav-item" data-page="payments" id="nav-payments">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+                <span>Payments</span>
+            </a>
+            <a href="#" class="nav-item" data-page="reports" id="nav-reports">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                <span>Reports</span>
+            </a>
+            <a href="#" class="nav-item" data-page="settings" id="nav-settings">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+                <span>Settings</span>
+            </a>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Top Bar -->
+        <header class="topbar">
+            <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle menu">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+            </button>
+            <div class="topbar-title" id="pageTitle">Dashboard</div>
+            <div class="topbar-actions">
+                <div class="notification-wrapper" id="notifWrapper" style="position:relative;">
+                    <div class="notification-bell" id="notificationBell">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+                        <span class="notification-badge" id="notifBadge" style="display:none;">0</span>
+                    </div>
+                    <!-- Notification Dropdown -->
+                    <div class="notification-dropdown" id="notifDropdown" style="display:none;">
+                        <div class="notif-drop-header">
+                            <span class="notif-drop-title">Notifications</span>
+                            <span class="notif-drop-clear" id="notifClearBtn" style="cursor:pointer; font-size:12px; font-weight:500; color:var(--primary); display:none;">Clear All</span>
+                        </div>
+                        <div class="notif-drop-body" id="notifDropBody">
+                            <!-- Populated via JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Notification Banner -->
+        <div class="notification-banner" id="notifBanner" style="display:none;">
+            <div class="notif-banner-content" id="notifBannerContent"></div>
+            <button class="notif-banner-close" id="notifBannerClose">&times;</button>
+        </div>
+
+        <!-- Page Container -->
+        <div class="page-container" id="pageContainer">
+            <!-- Pages are rendered dynamically by JS -->
+        </div>
+    </main>
+
+    <!-- Modal Overlay -->
+    <div class="modal-overlay" id="modalOverlay" style="display:none;">
+        <div class="modal" id="modalContent">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modalTitle"></h3>
+                <button class="modal-close" id="modalClose">&times;</button>
+            </div>
+            <div class="modal-body" id="modalBody"></div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="/static/js/app.js?v=${{ range(1, 1000) | random }}"></script>
+</body>
+</html>
