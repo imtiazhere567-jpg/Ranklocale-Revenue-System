@@ -41,7 +41,7 @@ def dashboard():
 
     # Total estimated revenue for the month
     with db_execute(conn, 
-        "SELECT COALESCE(SUM(estimated_revenue), 0) as total FROM contracts WHERE date >= ? AND date < ?",
+        "SELECT COALESCE(SUM(estimated_revenue), 0) as total FROM contracts WHERE date >= %s AND date < %s",
         (year_month_start, next_month_start)
     ) as cursor:
         total_sales = cursor.fetchone()["total"]
@@ -51,7 +51,7 @@ def dashboard():
         SELECT COALESCE(SUM(p.amount), 0) as total
         FROM payments p
         JOIN contracts c ON p.contract_id = c.id
-        WHERE c.date >= ? AND c.date < ?
+        WHERE c.date >= %s AND c.date < %s
     """, (year_month_start, next_month_start)) as cursor:
         total_recovered = cursor.fetchone()["total"]
 
@@ -61,7 +61,7 @@ def dashboard():
     with db_execute(conn, """
         SELECT COALESCE(SUM(balance), 0) as total FROM (
             SELECT c.estimated_revenue - COALESCE((SELECT SUM(amount) FROM payments WHERE contract_id = c.id), 0) as balance
-            FROM contracts c WHERE c.date < ?
+            FROM contracts c WHERE c.date < %s
         ) s
     """, (year_month_start,)) as cursor:
         legacy_pending = max(0, cursor.fetchone()["total"])
@@ -72,7 +72,7 @@ def dashboard():
         SELECT month_val, SUM(balance) as amount FROM (
             SELECT TO_CHAR(c.date, 'YYYY-MM') as month_val,
                    c.estimated_revenue - COALESCE((SELECT SUM(amount) FROM payments WHERE contract_id = c.id), 0) as balance
-            FROM contracts c WHERE c.date < ?
+            FROM contracts c WHERE c.date < %s
         ) s
         GROUP BY month_val ORDER BY month_val DESC
     """, (year_month_start,)) as cursor:
@@ -88,15 +88,15 @@ def dashboard():
         })
 
     # Upcoming deadlines (next 7 days)
-    today = datetime.now().strftime("%Y-%m-%d")
-    seven_days = (datetime.now() + timedelta(days=7)).strftime("%Y-%m-%d")
+    today = datetime.now().date()
+    seven_days = today + timedelta(days=7)
     
     # Contract deadlines
     row_deadlines = dicts_from_rows(conn.execute("""
         SELECT 'Contract: ' || c.contract_name as title, c.deadline as date, cl.name as client_name, c.id as contract_id, 'contract' as type
         FROM contracts c
         LEFT JOIN clients cl ON c.client_id = cl.id
-        WHERE c.deadline IS NOT NULL AND c.deadline <= ? AND c.deadline >= ?
+        WHERE c.deadline IS NOT NULL AND c.deadline <= %s AND c.deadline >= %s
           AND c.status IN ('In Progress', 'On Hold')
     """, (seven_days, today)).fetchall())
 
@@ -106,7 +106,7 @@ def dashboard():
         FROM milestones m
         JOIN contracts c ON m.contract_id = c.id
         LEFT JOIN clients cl ON c.client_id = cl.id
-        WHERE m.status = 'Pending' AND m.due_date <= ? AND m.due_date >= ?
+        WHERE m.status = 'Pending' AND m.due_date <= %s AND m.due_date >= %s
     """, (seven_days, today)).fetchall())
 
     all_upcoming = sorted(row_deadlines + milestone_deadlines, key=lambda x: x['date'])[:10]
@@ -116,7 +116,7 @@ def dashboard():
         SELECT 'Contract: ' || c.contract_name as title, c.deadline as date, cl.name as client_name, c.id as contract_id, 'contract' as type
         FROM contracts c
         LEFT JOIN clients cl ON c.client_id = cl.id
-        WHERE c.deadline IS NOT NULL AND c.deadline < ?
+        WHERE c.deadline IS NOT NULL AND c.deadline < %s
           AND c.status IN ('In Progress', 'On Hold')
     """, (today,)).fetchall())
 
@@ -125,7 +125,7 @@ def dashboard():
         FROM milestones m
         JOIN contracts c ON m.contract_id = c.id
         LEFT JOIN clients cl ON c.client_id = cl.id
-        WHERE m.status = 'Pending' AND m.due_date < ?
+        WHERE m.status = 'Pending' AND m.due_date < %s
     """, (today,)).fetchall())
 
     all_overdue = sorted(row_overdue + milestone_overdue, key=lambda x: x['date'])
@@ -169,7 +169,7 @@ def dashboard():
     # Overdue Breakdown (by deadline month)
     with db_execute(conn, """
         SELECT TO_CHAR(deadline, 'YYYY-MM') as m_val, COUNT(*) as count
-        FROM contracts WHERE status IN ('In Progress', 'On Hold') AND deadline < ? GROUP BY m_val
+        FROM contracts WHERE status IN ('In Progress', 'On Hold') AND deadline < %s GROUP BY m_val
         ORDER BY m_val DESC
     """, (today,)) as cursor:
         ov_data = cursor.fetchall()
@@ -178,7 +178,7 @@ def dashboard():
     with db_execute(conn, """
         SELECT TO_CHAR(m.due_date, 'YYYY-MM') as m_val, COUNT(*) as count
         FROM milestones m JOIN contracts c ON m.contract_id = c.id
-        WHERE m.status = 'Pending' AND m.due_date < ? GROUP BY m_val
+        WHERE m.status = 'Pending' AND m.due_date < %s GROUP BY m_val
     """, (today,)) as cursor:
         m_ov_data = cursor.fetchall()
         
@@ -193,14 +193,14 @@ def dashboard():
     # 1. Total Cash Collected This Month (regardless of contract date)
     with db_execute(conn, """
         SELECT COALESCE(SUM(amount), 0) as total FROM payments
-        WHERE payment_date >= ? AND payment_date < ?
+        WHERE payment_date >= %s AND payment_date < %s
     """, (year_month_start, next_month_start)) as cursor:
         cash_this_month = cursor.fetchone()["total"]
 
     # 2. New In Progress This Month
     with db_execute(conn, """
         SELECT COUNT(*) as count FROM contracts 
-        WHERE date >= ? AND date < ? AND status = 'In Progress'
+        WHERE date >= %s AND date < %s AND status = 'In Progress'
     """, (year_month_start, next_month_start)) as cursor:
         new_in_progress = cursor.fetchone()["count"]
 
@@ -208,14 +208,14 @@ def dashboard():
     with db_execute(conn, """
         SELECT COUNT(*) as count FROM contracts
         WHERE status IN ('In Progress', 'On Hold') 
-          AND deadline >= ? AND deadline < ? AND deadline < ?
+          AND deadline >= %s AND deadline < %s AND deadline < %s
     """, (year_month_start, next_month_start, today)) as cursor:
         overdue_this_month = cursor.fetchone()["count"]
         
     with db_execute(conn, """
         SELECT COUNT(*) as count FROM milestones
         WHERE status = 'Pending' 
-          AND due_date >= ? AND due_date < ? AND due_date < ?
+          AND due_date >= %s AND due_date < %s AND due_date < %s
     """, (year_month_start, next_month_start, today)) as cursor:
         overdue_this_month += cursor.fetchone()["count"]
 
@@ -300,10 +300,10 @@ def list_contracts():
     if p_from or p_to:
         query += " AND EXISTS (SELECT 1 FROM payments p2 WHERE p2.contract_id = c.id"
         if p_from:
-            query += " AND p2.payment_date >= ?"
+            query += " AND p2.payment_date >= %s"
             params.append(p_from)
         if p_to:
-            query += " AND p2.payment_date < ?"
+            query += " AND p2.payment_date < %s"
             params.append(p_to)
         query += ")"
 
@@ -314,7 +314,7 @@ def list_contracts():
     if request.args.get("is_overdue") == "true":
         query += " AND c.deadline < CURRENT_DATE AND c.status NOT IN ('Completed', 'Cancelled')"
     if request.args.get("search"):
-        query += " AND c.contract_name ILIKE ?"
+        query += " AND c.contract_name ILIKE %s"
         params.append(f"%{request.args.get('search')}%")
 
     query += " ORDER BY c.created_at DESC"
@@ -386,7 +386,7 @@ def create_contract():
     milestones = data.get("milestones", [])
     if data.get("payment_structure") == "Milestone" and milestones:
         for m in milestones:
-            conn.execute("INSERT INTO milestones (contract_id, description, amount, due_date) VALUES (?, ?, ?, ?)",
+            conn.execute("INSERT INTO milestones (contract_id, description, amount, due_date) VALUES (%s, %s, %s, %s)",
                          (contract_id, m.get("description"), m.get("amount"), m.get("due_date")))
 
     conn.commit()
@@ -412,7 +412,7 @@ def get_contract(cid):
         LEFT JOIN platform_profiles pp ON c.platform_profile_id = pp.id
         LEFT JOIN payment_channels pc ON c.payment_channel_id = pc.id
         LEFT JOIN client_types ct ON c.client_type_id = ct.id
-        WHERE c.id = ?
+        WHERE c.id = %s
     """, (cid,)) as cursor:
         contract = cursor.fetchone()
 
@@ -425,7 +425,7 @@ def get_contract(cid):
         SELECT p.*, pc.name as channel_name
         FROM payments p
         LEFT JOIN payment_channels pc ON p.payment_channel_id = pc.id
-        WHERE p.contract_id = ?
+        WHERE p.contract_id = %s
         ORDER BY p.payment_date DESC
     """, (cid,)) as cursor:
         payments = cursor.fetchall()
@@ -437,7 +437,7 @@ def get_contract(cid):
 
     # Attach milestones
     with db_execute(conn, """
-        SELECT * FROM milestones WHERE contract_id = ? ORDER BY due_date ASC
+        SELECT * FROM milestones WHERE contract_id = %s ORDER BY due_date ASC
     """, (cid,)) as cursor:
         contract["milestones"] = cursor.fetchall()
 
@@ -451,12 +451,12 @@ def update_contract(cid):
     conn = get_db()
     with db_execute(conn, """
         UPDATE contracts SET
-            contract_name=?, date=?, deadline=?, workspace=?, approved_date=?,
-            delay_reason=?, client_id=?, bdo_id=?, platform_id=?, platform_profile_id=?,
-            payment_channel_id=?, client_type_id=?, budget=?, estimated_revenue=?, 
-            payment_structure=?, status=?, notes=?,
+            contract_name=%s, date=%s, deadline=%s, workspace=%s, approved_date=%s,
+            delay_reason=%s, client_id=%s, bdo_id=%s, platform_id=%s, platform_profile_id=%s,
+            payment_channel_id=%s, client_type_id=%s, budget=%s, estimated_revenue=%s, 
+            payment_structure=%s, status=%s, notes=%s,
             updated_at=CURRENT_TIMESTAMP
-        WHERE id=?
+        WHERE id=%s
     """, (
         data.get("contract_name"), data.get("date"), data.get("deadline"),
         data.get("workspace"), data.get("approved_date"), data.get("delay_reason"),
@@ -474,7 +474,7 @@ def update_contract(cid):
 @app.route("/api/contracts/<int:cid>", methods=["DELETE"])
 def delete_contract(cid):
     conn = get_db()
-    with db_execute(conn, "DELETE FROM contracts WHERE id = ?", (cid,)):
+    with db_execute(conn, "DELETE FROM contracts WHERE id = %s", (cid,)):
         pass
     conn.commit()
     conn.close()
@@ -514,7 +514,7 @@ def create_client():
     conn = get_db()
     with db_execute(conn, """
         INSERT INTO clients (name, email, phone, company, status, notes)
-        VALUES (?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s)
         RETURNING id
     """, (
         data.get("name"), data.get("email"), data.get("phone"),
@@ -537,7 +537,7 @@ def find_or_create_client():
 
     conn = get_db()
     # Try to find existing client (case-insensitive)
-    with db_execute(conn, "SELECT * FROM clients WHERE LOWER(name) = LOWER(?)", (name,)) as cursor:
+    with db_execute(conn, "SELECT * FROM clients WHERE LOWER(name) = LOWER(%s)", (name,)) as cursor:
         existing = cursor.fetchone()
 
     if existing:
@@ -545,7 +545,7 @@ def find_or_create_client():
         return jsonify({"id": existing["id"], "name": existing["name"], "created": False})
 
     # Create new client
-    with db_execute(conn, "INSERT INTO clients (name, status) VALUES (?, 'Active') RETURNING id", (name,)) as cursor:
+    with db_execute(conn, "INSERT INTO clients (name, status) VALUES (%s, 'Active') RETURNING id", (name,)) as cursor:
         client_id = cursor.fetchone()["id"]
         
     conn.commit()
@@ -556,7 +556,7 @@ def find_or_create_client():
 @app.route("/api/clients/<int:cid>")
 def get_client(cid):
     conn = get_db()
-    with db_execute(conn, "SELECT * FROM clients WHERE id = ?", (cid,)) as cursor:
+    with db_execute(conn, "SELECT * FROM clients WHERE id = %s", (cid,)) as cursor:
         client = cursor.fetchone()
     if not client:
         conn.close()
@@ -567,7 +567,7 @@ def get_client(cid):
     with db_execute(conn, """
         SELECT COALESCE(SUM(balance), 0) as total FROM (
             SELECT c.estimated_revenue - COALESCE((SELECT SUM(amount) FROM payments WHERE contract_id = c.id), 0) as balance
-            FROM contracts c WHERE c.date < ? AND c.client_id = ?
+            FROM contracts c WHERE c.date < %s AND c.client_id = %s
         ) s
     """, (today, cid)) as cursor:
         legacy_pending = cursor.fetchone()["total"]
@@ -580,7 +580,7 @@ def get_client(cid):
         FROM contracts c
         LEFT JOIN bdos b ON c.bdo_id = b.id
         LEFT JOIN platforms p ON c.platform_id = p.id
-        WHERE c.client_id = ?
+        WHERE c.client_id = %s
         ORDER BY c.date DESC
     """, (cid,)) as cursor:
         contracts = cursor.fetchall()
@@ -595,7 +595,7 @@ def get_client(cid):
         FROM payments p
         JOIN contracts c ON p.contract_id = c.id
         LEFT JOIN payment_channels pc ON p.payment_channel_id = pc.id
-        WHERE c.client_id = ?
+        WHERE c.client_id = %s
         ORDER BY p.payment_date DESC
     """, (cid,)) as cursor:
         client["payments"] = cursor.fetchall()
@@ -609,9 +609,9 @@ def update_client(cid):
     data = request.json
     conn = get_db()
     with db_execute(conn, """
-        UPDATE clients SET name=?, email=?, phone=?, company=?, status=?, notes=?,
+        UPDATE clients SET name=%s, email=%s, phone=%s, company=%s, status=%s, notes=%s,
                updated_at=CURRENT_TIMESTAMP
-        WHERE id=?
+        WHERE id=%s
     """, (
         data.get("name"), data.get("email"), data.get("phone"),
         data.get("company"), data.get("status", "Active"), data.get("notes"), cid
@@ -625,7 +625,7 @@ def update_client(cid):
 @app.route("/api/clients/<int:cid>", methods=["DELETE"])
 def delete_client(cid):
     conn = get_db()
-    with db_execute(conn, "DELETE FROM clients WHERE id = ?", (cid,)):
+    with db_execute(conn, "DELETE FROM clients WHERE id = %s", (cid,)):
         pass
     conn.commit()
     conn.close()
@@ -677,7 +677,7 @@ def create_payment():
     conn = get_db()
     with db_execute(conn, """
         INSERT INTO payments (contract_id, amount, payment_date, payment_channel_id, notes)
-        VALUES (?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s)
         RETURNING id
     """, (
         data.get("contract_id"), data.get("amount"), data.get("payment_date"),
@@ -688,20 +688,20 @@ def create_payment():
     # Auto-Growth Budget logic
     cid = data.get("contract_id")
     if cid:
-        with db_execute(conn, "SELECT budget, estimated_revenue, platform_id FROM contracts WHERE id = ?", (cid,)) as cursor:
+        with db_execute(conn, "SELECT budget, estimated_revenue, platform_id FROM contracts WHERE id = %s", (cid,)) as cursor:
             c_row = cursor.fetchone()
-        with db_execute(conn, "SELECT SUM(amount) as s FROM payments WHERE contract_id = ?", (cid,)) as cursor:
+        with db_execute(conn, "SELECT SUM(amount) as s FROM payments WHERE contract_id = %s", (cid,)) as cursor:
             total_p = cursor.fetchone()["s"] or 0
         
         if total_p > (c_row["estimated_revenue"] or 0):
             fee = 0
             if c_row["platform_id"]:
-                with db_execute(conn, "SELECT fee_percentage FROM platforms WHERE id = ?", (c_row["platform_id"],)) as cursor:
+                with db_execute(conn, "SELECT fee_percentage FROM platforms WHERE id = %s", (c_row["platform_id"],)) as cursor:
                     p_row = cursor.fetchone()
                     if p_row: fee = p_row["fee_percentage"] or 0
             
             new_budget = total_p / (1 - (fee / 100)) if fee < 100 else total_p
-            with db_execute(conn, "UPDATE contracts SET budget = ?, estimated_revenue = ? WHERE id = ?", (new_budget, total_p, cid)):
+            with db_execute(conn, "UPDATE contracts SET budget = %s, estimated_revenue = %s WHERE id = %s", (new_budget, total_p, cid)):
                 pass
     
     conn.commit()
@@ -712,7 +712,7 @@ def create_payment():
 @app.route("/api/payments/<int:pid>", methods=["DELETE"])
 def delete_payment(pid):
     conn = get_db()
-    with db_execute(conn, "DELETE FROM payments WHERE id = ?", (pid,)):
+    with db_execute(conn, "DELETE FROM payments WHERE id = %s", (pid,)):
         pass
     conn.commit()
     conn.close()
@@ -743,7 +743,7 @@ def create_bdo():
     data = request.json
     conn = get_db()
     with db_execute(conn,
-        "INSERT INTO bdos (name, email, phone) VALUES (?, ?, ?) RETURNING id",
+        "INSERT INTO bdos (name, email, phone) VALUES (%s, %s, %s) RETURNING id",
         (data.get("name"), data.get("email"), data.get("phone"))
     ) as cursor:
         bdo_id = cursor.fetchone()["id"]
@@ -758,7 +758,7 @@ def update_bdo(bid):
     data = request.json
     conn = get_db()
     with db_execute(conn,
-        "UPDATE bdos SET name=?, email=?, phone=? WHERE id=?",
+        "UPDATE bdos SET name=%s, email=%s, phone=%s WHERE id=%s",
         (data.get("name"), data.get("email"), data.get("phone"), bid)
     ):
         pass
@@ -770,7 +770,7 @@ def update_bdo(bid):
 @app.route("/api/bdos/<int:bid>", methods=["DELETE"])
 def delete_bdo(bid):
     conn = get_db()
-    with db_execute(conn, "DELETE FROM bdos WHERE id = ?", (bid,)):
+    with db_execute(conn, "DELETE FROM bdos WHERE id = %s", (bid,)):
         pass
     conn.commit()
     conn.close()
@@ -794,7 +794,7 @@ def list_platforms():
 def create_platform():
     data = request.json
     conn = get_db()
-    with db_execute(conn, "INSERT INTO platforms (name, fee_percentage) VALUES (?, ?) RETURNING id", 
+    with db_execute(conn, "INSERT INTO platforms (name, fee_percentage) VALUES (%s, %s) RETURNING id", 
                           (data.get("name"), data.get("fee_percentage", 0))) as cursor:
         pid = cursor.fetchone()["id"]
         
@@ -806,7 +806,7 @@ def create_platform():
 def update_platform(pid):
     data = request.json
     conn = get_db()
-    with db_execute(conn, "UPDATE platforms SET name = ?, fee_percentage = ? WHERE id = ?", 
+    with db_execute(conn, "UPDATE platforms SET name = %s, fee_percentage = %s WHERE id = %s", 
                  (data.get("name"), data.get("fee_percentage", 0), pid)):
         pass
     conn.commit()
@@ -817,7 +817,7 @@ def update_platform(pid):
 @app.route("/api/platforms/<int:pid>", methods=["DELETE"])
 def delete_platform(pid):
     conn = get_db()
-    with db_execute(conn, "DELETE FROM platforms WHERE id = ?", (pid,)):
+    with db_execute(conn, "DELETE FROM platforms WHERE id = %s", (pid,)):
         pass
     conn.commit()
     conn.close()
@@ -834,7 +834,7 @@ def list_profiles():
     platform_id = request.args.get("platform_id")
     if platform_id:
         with db_execute(conn,
-            "SELECT pp.*, p.name as platform_name FROM platform_profiles pp JOIN platforms p ON pp.platform_id = p.id WHERE pp.platform_id = ? ORDER BY pp.profile_name",
+            "SELECT pp.*, p.name as platform_name FROM platform_profiles pp JOIN platforms p ON pp.platform_id = p.id WHERE pp.platform_id = %s ORDER BY pp.profile_name",
             (platform_id,)
         ) as cursor:
             profiles = cursor.fetchall()
@@ -853,7 +853,7 @@ def create_profile():
     data = request.json
     conn = get_db()
     with db_execute(conn,
-        "INSERT INTO platform_profiles (platform_id, profile_name, profile_url) VALUES (?, ?, ?) RETURNING id",
+        "INSERT INTO platform_profiles (platform_id, profile_name, profile_url) VALUES (%s, %s, %s) RETURNING id",
         (data.get("platform_id"), data.get("profile_name"), data.get("profile_url"))
     ) as cursor:
         prof_id = cursor.fetchone()["id"]
@@ -866,7 +866,7 @@ def create_profile():
 @app.route("/api/platform-profiles/<int:pid>", methods=["DELETE"])
 def delete_profile(pid):
     conn = get_db()
-    with db_execute(conn, "DELETE FROM platform_profiles WHERE id = ?", (pid,)):
+    with db_execute(conn, "DELETE FROM platform_profiles WHERE id = %s", (pid,)):
         pass
     conn.commit()
     conn.close()
@@ -890,7 +890,7 @@ def list_channels():
 def create_channel():
     data = request.json
     conn = get_db()
-    with db_execute(conn, "INSERT INTO payment_channels (name) VALUES (?) RETURNING id", (data.get("name"),)) as cursor:
+    with db_execute(conn, "INSERT INTO payment_channels (name) VALUES (%s) RETURNING id", (data.get("name"),)) as cursor:
         cid = cursor.fetchone()["id"]
         
     conn.commit()
@@ -901,7 +901,7 @@ def create_channel():
 @app.route("/api/payment-channels/<int:cid>", methods=["DELETE"])
 def delete_channel(cid):
     conn = get_db()
-    with db_execute(conn, "DELETE FROM payment_channels WHERE id = ?", (cid,)):
+    with db_execute(conn, "DELETE FROM payment_channels WHERE id = %s", (cid,)):
         pass
     conn.commit()
     conn.close()
@@ -925,7 +925,7 @@ def list_client_types():
 def create_client_type():
     data = request.json
     conn = get_db()
-    with db_execute(conn, "INSERT INTO client_types (name) VALUES (?) RETURNING id", (data.get("name"),)) as cursor:
+    with db_execute(conn, "INSERT INTO client_types (name) VALUES (%s) RETURNING id", (data.get("name"),)) as cursor:
         tid = cursor.fetchone()["id"]
     conn.commit()
     conn.close()
@@ -935,7 +935,7 @@ def create_client_type():
 @app.route("/api/client-types/<int:tid>", methods=["DELETE"])
 def delete_client_type(tid):
     conn = get_db()
-    with db_execute(conn, "DELETE FROM client_types WHERE id = ?", (tid,)):
+    with db_execute(conn, "DELETE FROM client_types WHERE id = %s", (tid,)):
         pass
     conn.commit()
     conn.close()
@@ -1194,7 +1194,7 @@ if __name__ == "__main__":
 def add_milestone():
     data = request.json
     conn = get_db()
-    with db_execute(conn, "INSERT INTO milestones (contract_id, description, amount, due_date, notes) VALUES (?, ?, ?, ?, ?) RETURNING id",
+    with db_execute(conn, "INSERT INTO milestones (contract_id, description, amount, due_date, notes) VALUES (%s, %s, %s, %s, %s) RETURNING id",
                          (data["contract_id"], data["description"], data["amount"], data["due_date"], data.get("notes"))) as cursor:
         mid = cursor.fetchone()["id"]
     conn.commit()
@@ -1205,13 +1205,13 @@ def add_milestone():
 def pay_milestone(mid):
     data = request.json or {}  # optional args: payment_channel_id, payment_date, notes
     conn = get_db()
-    with db_execute(conn, "SELECT * FROM milestones WHERE id=?", (mid,)) as cursor:
+    with db_execute(conn, "SELECT * FROM milestones WHERE id=%s", (mid,)) as cursor:
         milestone = cursor.fetchone()
     if not milestone:
         conn.close()
         return jsonify({"error": "Not found"}), 404
         
-    with db_execute(conn, "UPDATE milestones SET status='Paid' WHERE id=?", (mid,)):
+    with db_execute(conn, "UPDATE milestones SET status='Paid' WHERE id=%s", (mid,)):
         pass
     
     pay_date = data.get("payment_date")
@@ -1222,7 +1222,7 @@ def pay_milestone(mid):
     if not notes:
         notes = f"Milestone Payment: {milestone['description']}"
         
-    with db_execute(conn, "INSERT INTO payments (contract_id, amount, payment_date, payment_channel_id, notes) VALUES (?, ?, ?, ?, ?)",
+    with db_execute(conn, "INSERT INTO payments (contract_id, amount, payment_date, payment_channel_id, notes) VALUES (%s, %s, %s, %s, %s)",
                  (milestone["contract_id"], milestone["amount"], pay_date, data.get("payment_channel_id"), notes)):
         pass
     
@@ -1233,7 +1233,7 @@ def pay_milestone(mid):
 @app.route("/api/milestones/<int:mid>", methods=["DELETE"])
 def delete_milestone(mid):
     conn = get_db()
-    with db_execute(conn, "DELETE FROM milestones WHERE id=?", (mid,)):
+    with db_execute(conn, "DELETE FROM milestones WHERE id=%s", (mid,)):
         pass
     conn.commit()
     conn.close()
