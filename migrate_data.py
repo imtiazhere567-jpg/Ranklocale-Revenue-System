@@ -1,40 +1,29 @@
-"""
-Data Migration Script: SQLite -> PostgreSQL (Supabase)
-Run this locally to upload your current data to the cloud.
-"""
-
 import sqlite3
-import psycopg2
-from psycopg2.extras import RealDictCursor
 import os
 from dotenv import load_dotenv
+from models import get_db, init_db
 
 load_dotenv()
 
-SQLITE_PATH = "database.db"
-POSTGRES_URL = os.getenv("DATABASE_URL")
-
-from models import init_db
-
 def migrate():
-    if not POSTGRES_URL:
-        print("RED ALERT: DATABASE_URL not found in environment variables!")
-        return
-
     # Ensure tables are created first
     print("Initializing tables in Supabase...")
     try:
         init_db()
     except Exception as e:
-        print(f"Warning: Table initialization might have failed or tables already exist: {e}")
+        print(f"Warning: Table initialization failed or tables already exist: {e}")
 
     print("Connecting to databases...")
-    sqlite_conn = sqlite3.connect(SQLITE_PATH)
+    sqlite_conn = sqlite3.connect("database.db")
     sqlite_conn.row_factory = sqlite3.Row
     
-    pg_conn = psycopg2.connect(POSTGRES_URL)
-    pg_conn.autocommit = True # Ensure sequences and other changes are committed
-    pg_cursor = pg_conn.cursor()
+    try:
+        pg_conn = get_db()
+        pg_conn.autocommit = True
+        pg_cursor = pg_conn.cursor()
+    except Exception as e:
+        print(f"RED ALERT: Could not connect to Supabase! {e}")
+        return
 
     def get_sqlite_data(table):
         try:

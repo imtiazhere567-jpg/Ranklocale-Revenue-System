@@ -10,15 +10,36 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Example: postgresql://user:password@host:port/dbname
+# Connection parameters (preferred for stability)
+DBHOST = os.getenv("DBHOST")
+DBUSER = os.getenv("DBUSER")
+DBPASS = os.getenv("DBPASS")
+DBNAME = os.getenv("DBNAME")
+DBPORT = os.getenv("DBPORT", "5432")
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 def get_db():
-    """Get a database connection with dict-like cursor."""
-    if not DATABASE_URL:
-        raise ValueError("DATABASE_URL environment variable is not set!")
-    conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
-    return conn
+    """Get a database connection with dict-like cursor (resilient version)."""
+    try:
+        if DBHOST and DBUSER and DBPASS and DBNAME:
+            # Connect using individual components (avoid URI parsing bugs with @ symbols)
+            conn = psycopg2.connect(
+                host=DBHOST,
+                user=DBUSER,
+                password=DBPASS,
+                dbname=DBNAME,
+                port=DBPORT,
+                cursor_factory=RealDictCursor
+            )
+        elif DATABASE_URL:
+            # Fallback to single string URI
+            conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+        else:
+            raise ValueError("No database connection settings found (DBHOST, DBUSER, etc. or DATABASE_URL)!")
+        return conn
+    except Exception as e:
+        print(f"Error connecting to database: {e}")
+        raise
 
 class db_execute:
     """Helper to mimic sqlite3.Connection.execute and return a cursor."""
