@@ -92,41 +92,45 @@ def dashboard():
     seven_days = today + timedelta(days=7)
     
     # Contract deadlines
-    row_deadlines = dicts_from_rows(conn.execute("""
+    with db_execute(conn, """
         SELECT 'Contract: ' || c.contract_name as title, c.deadline as date, cl.name as client_name, c.id as contract_id, 'contract' as type
         FROM contracts c
         LEFT JOIN clients cl ON c.client_id = cl.id
         WHERE c.deadline IS NOT NULL AND c.deadline <= %s AND c.deadline >= %s
           AND c.status IN ('In Progress', 'On Hold')
-    """, (seven_days, today)).fetchall())
+    """, (seven_days, today)) as cursor:
+        row_deadlines = dicts_from_rows(cursor.fetchall())
 
     # Milestone deadlines
-    milestone_deadlines = dicts_from_rows(conn.execute("""
+    with db_execute(conn, """
         SELECT 'Milestone: ' || m.description || ' (' || c.contract_name || ')' as title, m.due_date as date, cl.name as client_name, c.id as contract_id, 'milestone' as type
         FROM milestones m
         JOIN contracts c ON m.contract_id = c.id
         LEFT JOIN clients cl ON c.client_id = cl.id
         WHERE m.status = 'Pending' AND m.due_date <= %s AND m.due_date >= %s
-    """, (seven_days, today)).fetchall())
+    """, (seven_days, today)) as cursor:
+        milestone_deadlines = dicts_from_rows(cursor.fetchall())
 
     all_upcoming = sorted(row_deadlines + milestone_deadlines, key=lambda x: x['date'])[:10]
 
     # Overdue
-    row_overdue = dicts_from_rows(conn.execute("""
+    with db_execute(conn, """
         SELECT 'Contract: ' || c.contract_name as title, c.deadline as date, cl.name as client_name, c.id as contract_id, 'contract' as type
         FROM contracts c
         LEFT JOIN clients cl ON c.client_id = cl.id
         WHERE c.deadline IS NOT NULL AND c.deadline < %s
           AND c.status IN ('In Progress', 'On Hold')
-    """, (today,)).fetchall())
+    """, (today,)) as cursor:
+        row_overdue = dicts_from_rows(cursor.fetchall())
 
-    milestone_overdue = dicts_from_rows(conn.execute("""
+    with db_execute(conn, """
         SELECT 'Milestone: ' || m.description || ' (' || c.contract_name || ')' as title, m.due_date as date, cl.name as client_name, c.id as contract_id, 'milestone' as type
         FROM milestones m
         JOIN contracts c ON m.contract_id = c.id
         LEFT JOIN clients cl ON c.client_id = cl.id
         WHERE m.status = 'Pending' AND m.due_date < %s
-    """, (today,)).fetchall())
+    """, (today,)) as cursor:
+        milestone_overdue = dicts_from_rows(cursor.fetchall())
 
     all_overdue = sorted(row_overdue + milestone_overdue, key=lambda x: x['date'])
 
@@ -384,10 +388,10 @@ def create_contract():
         contract_id = cursor.fetchone()["id"]
     
     milestones = data.get("milestones", [])
-    if data.get("payment_structure") == "Milestone" and milestones:
         for m in milestones:
-            conn.execute("INSERT INTO milestones (contract_id, description, amount, due_date) VALUES (%s, %s, %s, %s)",
-                         (contract_id, m.get("description"), m.get("amount"), m.get("due_date")))
+            with db_execute(conn, "INSERT INTO milestones (contract_id, description, amount, due_date) VALUES (%s, %s, %s, %s)",
+                         (contract_id, m.get("description"), m.get("amount"), m.get("due_date"))):
+                pass
 
     conn.commit()
     conn.close()
