@@ -1170,9 +1170,17 @@ def export_contracts():
 
 # ──────────────────────────────────────────────
 
-# Initialize DB on import (works with reloader too)
-with app.app_context():
-    init_db()
+# Initialize DB on import if DATABASE_URL is available
+# This prevents Vercel from failing the entire import phase if the env var isn't set yet.
+from models import DATABASE_URL
+if DATABASE_URL:
+    with app.app_context():
+        try:
+            init_db()
+        except Exception as e:
+            print(f"Warning: Failed to initialize database: {e}")
+else:
+    print("Warning: DATABASE_URL not set. Skipping init_db().")
 
 if __name__ == "__main__":
     print("\n  Ranklocale Revenue System running at http://localhost:5000\n")
