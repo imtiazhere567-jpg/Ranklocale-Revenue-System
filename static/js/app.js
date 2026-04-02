@@ -252,7 +252,10 @@ async function renderDashboard() {
     try {
         const data = await api(`/api/dashboard?month=${state.dashboardMonth}`);
         _renderDashboardData(data);
-    } catch (e) {}
+    } catch (e) {
+        console.error("Dashboard Render Error:", e);
+        showToast("Error loading dashboard data", "danger");
+    }
 }
 
 function _renderDashboardData(data) {
@@ -286,6 +289,7 @@ function _renderDashboardData(data) {
                     <div class="legacy-tooltip-content">
                         <div style="margin-bottom:8px; border-bottom:1px solid rgba(255,255,255,0.2); padding-bottom:4px; font-weight:700;">Recovery Sources (by Month)</div>
                         ${(data.recovered_breakdown || []).map(b => {
+                            if (!b.m_val) return '';
                             const [by, bm] = b.m_val.split('-');
                             let nBM = parseInt(bm) + 1;
                             let nBY = parseInt(by);
@@ -317,7 +321,9 @@ function _renderDashboardData(data) {
                     Incl. ${formatCurrency(data.legacy_pending)} from previous months
                     <div class="legacy-tooltip-content">
                         <div style="margin-bottom:8px; border-bottom:1px solid rgba(255,255,255,0.2); padding-bottom:4px; font-weight:700;">Pending Breakdown</div>
-                        ${(data.legacy_breakdown || []).map(b => `
+                        ${(data.legacy_breakdown || []).map(b => {
+                            if (!b.month_val) return '';
+                            return `
                             <div class="legacy-breakdown-row" 
                                  style="cursor:pointer; padding:8px 12px; border-radius:4px; margin-bottom:2px; display:flex; justify-content:space-between; align-items:center;"
                                  onclick="event.stopPropagation(); openFilteredContracts({dateFrom: '${b.month_val}-01', dateTo: '${b.month_val}-31', payment_status: 'pending'})"
@@ -326,7 +332,7 @@ function _renderDashboardData(data) {
                                 <span style="font-size:12px;">${b.month}</span>
                                 <span style="font-weight:700; color:var(--warning); font-family:monospace;">${formatCurrency(b.amount)}</span>
                             </div>
-                        `).join('')}
+                        `;}).join('')}
                     </div>
                 </span>
             </div>
@@ -342,6 +348,7 @@ function _renderDashboardData(data) {
                     <div class="legacy-tooltip-content">
                         <div style="margin-bottom:8px; border-bottom:1px solid rgba(255,255,255,0.2); padding-bottom:4px; font-weight:700;">Month-wise Active</div>
                         ${(data.in_progress_breakdown || []).map(b => {
+                            if (!b.m_val) return '';
                             const [by, bm] = b.m_val.split('-');
                             let nBM = parseInt(bm) + 1; let nBY = parseInt(by);
                             if (nBM > 12) { nBM = 1; nBY++; }
