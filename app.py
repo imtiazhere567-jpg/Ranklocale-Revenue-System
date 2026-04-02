@@ -159,7 +159,7 @@ def dashboard():
         ORDER BY m_val DESC
     """, (year_month_start, next_month_start)) as cursor:
         recovered_data = cursor.fetchall()
-    recovered_breakdown = [{"month": datetime.strptime(r['m_val'], "%Y-%m").strftime("%B %Y"), "amount": r['amt'], "m_val": r['m_val']} for r in recovered_data]
+    recovered_breakdown = [{"month": datetime.strptime(r['m_val'], "%Y-%m").strftime("%B %Y") if r['m_val'] else "Unknown", "amount": r['amt'], "m_val": r['m_val']} for r in recovered_data]
 
     # In Progress Breakdown (by contract start month)
     with db_execute(conn, """
@@ -168,7 +168,7 @@ def dashboard():
         ORDER BY m_val DESC
     """) as cursor:
         ip_data = cursor.fetchall()
-    in_progress_breakdown = [{"month": datetime.strptime(r['m_val'], "%Y-%m").strftime("%B %Y"), "count": r['count'], "m_val": r['m_val']} for r in ip_data]
+    in_progress_breakdown = [{"month": datetime.strptime(r['m_val'], "%Y-%m").strftime("%B %Y") if r['m_val'] else "Unknown", "count": r['count'], "m_val": r['m_val']} for r in ip_data]
 
     # Overdue Breakdown (by deadline month)
     with db_execute(conn, """
@@ -190,7 +190,7 @@ def dashboard():
     merged_ov = {}
     for r in ov_data: merged_ov[r['m_val']] = merged_ov.get(r['m_val'], 0) + r['count']
     for r in m_ov_data: merged_ov[r['m_val']] = merged_ov.get(r['m_val'], 0) + r['count']
-    overdue_breakdown = [{"month": datetime.strptime(m, "%Y-%m").strftime("%B %Y"), "count": c, "m_val": m} for m, c in merged_ov.items()]
+    overdue_breakdown = [{"month": datetime.strptime(m, "%Y-%m").strftime("%B %Y") if m else "Unknown", "count": c, "m_val": m} for m, c in merged_ov.items()]
     
     # Extra Metrics for Comparative UI
     
