@@ -5,20 +5,16 @@ import sys
 
 # 1. Load your credentials
 load_dotenv()
-DATABASE_URL = os.getenv("DATABASE_URL")
+from models import get_db
 
 def check_everything():
     print("--- Supabase Diagnostic Tool ---")
     
-    if not DATABASE_URL:
-        print("ERROR: DATABASE_URL not found in your .env file!")
-        return
-
     print("Attempting to connect...")
 
     try:
         # 2. Test Connection
-        conn = psycopg2.connect(DATABASE_URL)
+        conn = get_db()
         print("Connection Successful!")
         
         # 3. Check for tables
@@ -28,7 +24,7 @@ def check_everything():
                 FROM information_schema.tables 
                 WHERE table_schema = 'public'
             """)
-            tables = [row[0] for row in cur.fetchall()]
+            tables = [row['table_name'] for row in cur.fetchall()]
             
             if not tables:
                 print("Supabase is EMPTY (No tables found).")

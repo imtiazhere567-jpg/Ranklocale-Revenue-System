@@ -29,6 +29,7 @@ def get_db():
                 password=DBPASS,
                 dbname=DBNAME,
                 port=DBPORT,
+                sslmode='require',
                 cursor_factory=RealDictCursor
             )
         elif DATABASE_URL:
