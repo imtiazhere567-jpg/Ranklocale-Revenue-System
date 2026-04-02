@@ -159,7 +159,7 @@ def dashboard():
         ORDER BY m_val DESC
     """, (year_month_start, next_month_start)) as cursor:
         recovered_data = cursor.fetchall()
-    recovered_breakdown = [{"month": datetime.strptime(r['m_val'], "%Y-%m").strftime("%B %Y") if r['m_val'] else "Unknown", "amount": r['amt'], "m_val": r['m_val']} for r in recovered_data]
+    recovered_breakdown = [{"month": datetime.strptime(str(r['m_val']), "%Y-%m").strftime("%B %Y") if (r.get('m_val') and r['m_val'] != 'None') else "Unknown", "amount": r['amt'], "m_val": r['m_val']} for r in recovered_data]
 
     # In Progress Breakdown (by contract start month)
     with db_execute(conn, """
@@ -168,7 +168,7 @@ def dashboard():
         ORDER BY m_val DESC
     """) as cursor:
         ip_data = cursor.fetchall()
-    in_progress_breakdown = [{"month": datetime.strptime(r['m_val'], "%Y-%m").strftime("%B %Y") if r['m_val'] else "Unknown", "count": r['count'], "m_val": r['m_val']} for r in ip_data]
+    in_progress_breakdown = [{"month": datetime.strptime(str(r['m_val']), "%Y-%m").strftime("%B %Y") if (r.get('m_val') and r['m_val'] != 'None') else "Unknown", "count": r['count'], "m_val": r['m_val']} for r in ip_data]
 
     # Overdue Breakdown (by deadline month)
     with db_execute(conn, """
@@ -190,7 +190,7 @@ def dashboard():
     merged_ov = {}
     for r in ov_data: merged_ov[r['m_val']] = merged_ov.get(r['m_val'], 0) + r['count']
     for r in m_ov_data: merged_ov[r['m_val']] = merged_ov.get(r['m_val'], 0) + r['count']
-    overdue_breakdown = [{"month": datetime.strptime(m, "%Y-%m").strftime("%B %Y") if m else "Unknown", "count": c, "m_val": m} for m, c in merged_ov.items()]
+    overdue_breakdown = [{"month": datetime.strptime(str(m), "%Y-%m").strftime("%B %Y") if (m and m != 'None') else "Unknown", "count": c, "m_val": m} for m, c in merged_ov.items()]
     
     # Extra Metrics for Comparative UI
     
@@ -1073,19 +1073,25 @@ def advanced_report():
     stats["total_pending"] = stats["total_net"] - stats["total_recovered"]
     stats["recovery_rate"] = round((stats["total_recovered"] / stats["total_net"] * 100), 1) if stats["total_net"] > 0 else 0
     
-    # Monthly Trend (using TO_CHAR)
+    # Monthly Trend (using robust JOIN to avoid GroupingError in Postgres)
     trend_query = f"""
         SELECT 
-            TO_CHAR(c.date, 'YYYY-MM') as month,
-            SUM(c.estimated_revenue) as net_revenue,
-            (SELECT SUM(p.amount) 
-             FROM payments p 
-             JOIN contracts c2 ON p.contract_id = c2.id 
-             WHERE TO_CHAR(c2.date, 'YYYY-MM') = TO_CHAR(c.date, 'YYYY-MM') 
-             AND {where_sql.replace('c.', 'c2.')}) as recovered
-        FROM contracts c
-        WHERE {where_sql}
-        GROUP BY month
+            n.month as month,
+            n.net_revenue,
+            COALESCE(r.recovered, 0) as recovered
+        FROM (
+            SELECT TO_CHAR(date, 'YYYY-MM') as month, SUM(estimated_revenue) as net_revenue
+            FROM contracts
+            WHERE {where_sql}
+            GROUP BY month
+        ) n
+        LEFT JOIN (
+            SELECT TO_CHAR(c2.date, 'YYYY-MM') as month, SUM(p.amount) as recovered
+            FROM payments p
+            JOIN contracts c2 ON p.contract_id = c2.id
+            WHERE {where_sql.replace('c.', 'c2.')}
+            GROUP BY month
+        ) r ON n.month = r.month
         ORDER BY month ASC
         LIMIT 24
     """
